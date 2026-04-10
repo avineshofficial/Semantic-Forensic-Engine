@@ -205,3 +205,90 @@ button:disabled {
     border: 1px solid #007bff;
     margin-bottom: 10px;
 }
+
+.navbar .nav-links {
+  display: flex;
+  align-items: center;
+}
+
+.navbar button {
+  background: var(--accent);
+  border: none;
+  color: white;
+  padding: 8px 15px;
+  border-radius: 5px;
+  margin-left: 20px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.navbar button:hover {
+  background: #d35400;
+}
+
+/* Navbar Styling Updates */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 5%;
+  background: var(--primary);
+  color: white;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.nav-links a {
+  text-decoration: none;
+  color: white;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: color 0.3s;
+}
+
+.nav-links a:hover {
+  color: var(--accent);
+}
+
+.btn-logout {
+  background: transparent;
+  border: 1px solid white;
+  color: white;
+  padding: 6px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 0.8rem;
+  transition: all 0.3s;
+}
+
+.btn-logout:hover {
+  background: white;
+  color: var(--primary);
+}
+
+/* Badge colors for the Activity Page */
+.badge-match {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+table th {
+    background-color: #f8f9fa;
+    color: var(--secondary);
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+}
+
+tr:hover {
+    background-color: #fffcf5;
+}
+
+.dashboard-grid h2 {
+    margin: 10px 0;
+}

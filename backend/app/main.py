@@ -5,6 +5,8 @@ import ollama
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from firebase_admin import credentials, firestore, initialize_app
+from firebase_admin import auth as admin_auth
+from .geotime import calculate_plausibility
 
 # Import the CLIP matching logic from our other file
 try:
@@ -39,11 +41,12 @@ def read_root():
 @app.get("/run-match/{lost_item_id}")
 async def run_match_engine(lost_item_id: str):
     """
-    Takes a lost item ID, gets its description, compares it to all 
-    found images using CLIP, and returns ranked matches.
+    Forensic Match Engine v2.0
+    Combines CLIP Semantic AI (70%) with Spatio-Temporal Plausibility (30%)
+    to prevent fraudulent claims and physical impossibilities.
     """
     try:
-        # 1. Get Lost Item details from Firestore
+        # 1. Fetch Lost Item details from Firestore
         lost_ref = db.collection('lost_items').document(lost_item_id).get()
         if not lost_ref.exists:
             raise HTTPException(status_code=404, detail="Lost item report not found")
@@ -51,7 +54,7 @@ async def run_match_engine(lost_item_id: str):
         lost_data = lost_ref.to_dict()
         description = lost_data.get('description', '')
 
-        # 2. Get all unclaimed Found Items
+        # 2. Query all unclaimed Found Items
         found_items_docs = db.collection('found_items').where('status', '==', 'unclaimed').stream()
         
         matches = []
@@ -63,27 +66,46 @@ async def run_match_engine(lost_item_id: str):
             if not image_url:
                 continue
 
-            # 3. Call CLIP (from matcher.py) to get similarity score
-            # CLIP compares the text "description" with the "image_url"
-            score = calculate_similarity(description, image_url)
+            # --- FORENSIC ANALYSIS CORE ---
 
-            # 4. Only include results that have a reasonable match (>20%)
-            if score > 20:
+            # A. AI Vision Analysis (CLIP)
+            # Measures how well the text matches the pixels
+            ai_similarity = calculate_similarity(description, image_url)
+
+            # B. Spatio-Temporal Plausibility (Logic)
+            # Measures if the time and place of the found item make sense
+            plausibility_score = calculate_plausibility(lost_data, found_data)
+
+            # C. Weighted Confidence Scoring
+            # Formula: (AI * 0.7) + (Logic * 0.3)
+            # We trust the AI more, but logic can "veto" or "boost" a match.
+            combined_confidence = int((ai_similarity * 0.7) + (plausibility_score * 0.3))
+
+            # 3. Filtering: Only include items with high forensic probability
+            if combined_confidence > 25:
                 matches.append({
                     "found_item_id": doc.id,
-                    "confidence": score,
+                    "confidence": combined_confidence,
+                    "ai_score": ai_similarity,
+                    "logic_score": plausibility_score,
                     "image_url": image_url,
                     "location": found_data.get('location', 'Unknown Location'),
-                    "category": found_data.get('category', 'General')
+                    "category": found_data.get('category', 'General'),
+                    "found_at": found_data.get('createdAt')
                 })
 
-        # 5. Sort matches: Highest confidence first
+        # 4. Sort matches: Highest Forensic Confidence first
         sorted_matches = sorted(matches, key=lambda x: x['confidence'], reverse=True)
 
-        return {"lost_item_id": lost_item_id, "matches": sorted_matches}
+        return {
+            "lost_item_id": lost_item_id, 
+            "forensic_status": "ANALYSIS_COMPLETE",
+            "matches": sorted_matches
+        }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Engine Error: {e}")
+        raise HTTPException(status_code=500, detail="Forensic Engine Analysis Failed")
 
 # --- PHASE 3: OLLAMA AI GUARDIAN ENDPOINTS ---
 
@@ -156,6 +178,21 @@ async def verify_answers(data: dict = Body(...)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.get("/get-contact/{item_id}")
+async def get_contact(item_id: str):
+    # 1. Fetch the item
+    item = db.collection('found_items').document(item_id).get()
+    if not item.exists:
+        return {"error": "Item not found"}
+    
+    # 2. Get the finder's ID
+    finder_id = item.to_dict().get('finderId')
+    
+    # 3. Get the user email using Firebase Admin SDK
+    user = admin_auth.get_user(finder_id)
+    return {"email": user.email}
 
 # 4. Run the server (if this file is executed directly)
 if __name__ == "__main__":

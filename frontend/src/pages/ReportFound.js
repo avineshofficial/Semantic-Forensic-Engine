@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
-import { db, storage } from '../firebase';
+import { db, storage, auth } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useNavigate } from 'react-router-dom';
 
 function ReportFound() {
     const [image, setImage] = useState(null);
+    const [location, setLocation] = useState('');
     const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
     const handleUpload = async (e) => {
         e.preventDefault();
-        if (!image) return;
+        if (!image) {
+            alert("Please select an image first.");
+            return;
+        }
+        
         setLoading(true);
 
         try {
@@ -21,14 +28,17 @@ function ReportFound() {
             // 2. Save Metadata to Firestore
             await addDoc(collection(db, "found_items"), {
                 image_url: url,
+                location: location,
+                finderId: auth.currentUser.uid, // Track who found it
                 status: "unclaimed",
                 createdAt: new Date(),
-                // Location and category would be added here similarly
             });
 
-            alert("Found item uploaded!");
+            alert("Evidence logged in secure inventory.");
+            navigate('/'); // Return to dashboard
         } catch (error) {
             console.error(error);
+            alert("Upload failed.");
         } finally {
             setLoading(false);
         }
@@ -36,35 +46,44 @@ function ReportFound() {
 
     return (
         <div className="main-content">
-    <div className="card" style={{maxWidth: '600px', margin: '0 auto'}}>
-        <h2>Submit Forensic Evidence</h2>
-        <p>Upload an image of the found item for semantic analysis.</p>
-        
-        <form onSubmit={handleUpload}>
-            <div className="form-group" style={{border: '2px dashed #ccc', padding: '40px', textAlign: 'center', borderRadius: '12px'}}>
-                <input 
-                    type="file" 
-                    id="file-upload" 
-                    onChange={(e) => setImage(e.target.files[0])} 
-                    style={{display: 'none'}} 
-                />
-                <label htmlFor="file-upload" style={{cursor: 'pointer'}}>
-                    <div style={{fontSize: '40px'}}>📸</div>
-                    {image ? image.name : "Click to select or drag item image"}
-                </label>
-            </div>
-            
-            <div className="form-group">
-                <label>Discovery Location</label>
-                <input type="text" placeholder="e.g. Campus Library, Room 204" />
-            </div>
+            <div className="card" style={{maxWidth: '600px', margin: '0 auto'}}>
+                <div style={{textAlign: 'center', marginBottom: '20px'}}>
+                    <div className="badge badge-pending">FORENSIC INTAKE</div>
+                    <h2>Log Found Item</h2>
+                </div>
+                
+                <form onSubmit={handleUpload}>
+                    <div className="form-group" style={{border: '2px dashed #ccc', padding: '30px', textAlign: 'center', borderRadius: '12px'}}>
+                        <input 
+                            type="file" 
+                            id="file-upload" 
+                            onChange={(e) => setImage(e.target.files[0])} 
+                            style={{display: 'none'}} 
+                            required
+                        />
+                        <label htmlFor="file-upload" style={{cursor: 'pointer'}}>
+                            <div style={{fontSize: '40px'}}>📸</div>
+                            {image ? <span style={{color: 'green'}}>{image.name}</span> : "Click to Upload Item Image"}
+                        </label>
+                    </div>
+                    
+                    <div className="form-group">
+                        <label>Discovery Location</label>
+                        <input 
+                            type="text" 
+                            placeholder="e.g. Canteen Basement or Bus Stand" 
+                            value={location}
+                            onChange={(e) => setLocation(e.target.value)}
+                            required
+                        />
+                    </div>
 
-            <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? "Analyzing Features..." : "Initiate System Entry"}
-            </button>
-        </form>
-    </div>
-</div>
+                    <button type="submit" className="btn-primary" disabled={loading}>
+                        {loading ? "PROCESSING IMAGE..." : "SECURE TO DATABASE"}
+                    </button>
+                </form>
+            </div>
+        </div>
     );
 }
 
