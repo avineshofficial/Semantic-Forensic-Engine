@@ -1,59 +1,105 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-
-const mockMatches = [
-  { 
-    id: "f101", 
-    image: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=300&auto=format&fit=crop", 
-    confidence: 94, 
-    location: "Library Cafeteria" 
-  },
-  { 
-    id: "f102", 
-    image: "https://images.unsplash.com/photo-1512233629035-199193521e8c?q=80&w=300&auto=format&fit=crop", 
-    confidence: 81, 
-    location: "Science Block" 
-  }
-];
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 function Matches() {
-  const navigate = useNavigate();
+    const [matches, setMatches] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const location = useLocation();
+    const navigate = useNavigate();
 
-  return (
-    <div className="main-content">
-      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px'}}>
-        <h1>Semantic Matches</h1>
-        <div className="badge badge-match">Engine: CLIP-ViT-L/14</div>
-      </div>
+    // Get the lostItemId passed from the ReportLost page
+    const lostItemId = location.state?.lostItemId;
 
-      <div className="dashboard-grid">
-        {mockMatches.map((item) => (
-          <div key={item.id} className="card" style={{padding: '10px'}}>
-            <img 
-              src={item.image} 
-              alt="Found Item" 
-              style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} 
-            />
-            <div style={{padding: '15px'}}>
-              <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '10px'}}>
-                 <strong>Confidence</strong>
-                 <span style={{color: '#27ae60', fontWeight: 'bold'}}>{item.confidence}%</span>
-              </div>
-              <p><strong>Found at:</strong> {item.location}</p>
-              
-              <button 
-                className="btn-primary" 
-                onClick={() => navigate(`/guardian/${item.id}`)}
-                style={{fontSize: '0.9rem'}}
-              >
-                Start Verification Process
-              </button>
+    useEffect(() => {
+        if (!lostItemId) {
+            setLoading(false);
+            return;
+        }
+
+        // Call the FastAPI CLIP Engine
+        const fetchMatches = async () => {
+            try {
+                const response = await axios.get(`http://localhost:8000/run-match/${lostItemId}`);
+                setMatches(response.data.matches);
+            } catch (error) {
+                console.error("Error fetching matches:", error);
+                alert("Failed to connect to AI Engine. Make sure Backend is running.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchMatches();
+    }, [lostItemId]);
+
+    if (loading) {
+        return (
+            <div className="main-content" style={{ textAlign: 'center', marginTop: '100px' }}>
+                <div className="verifying-text" style={{ fontSize: '1.5rem' }}>
+                    🔍 AGENT SCANNING DATABASE...
+                </div>
+                <p>Running CLIP Semantic Analysis on images...</p>
             </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+        );
+    }
+
+    return (
+        <div className="main-content">
+            <header style={{ marginBottom: '30px' }}>
+                <h1>Semantic Match Results</h1>
+                <p>Ranked by visual similarity to your description.</p>
+            </header>
+
+            {matches.length === 0 ? (
+                <div className="card">
+                    <h2>No Strong Matches Found</h2>
+                    <p>We couldn't find items that match your description yet. We will notify you when a match is uploaded.</p>
+                </div>
+            ) : (
+                <div className="dashboard-grid">
+                    {matches.map((item) => (
+                        <div key={item.found_item_id} className="card" style={{ padding: '10px' }}>
+                            <div style={{ position: 'relative' }}>
+                                <img 
+                                    src={item.image_url} 
+                                    alt="Evidence" 
+                                    style={{ 
+                                        width: '100%', 
+                                        height: '220px', 
+                                        objectFit: 'cover', 
+                                        borderRadius: '8px',
+                                        filter: 'blur(8px)' // Privacy: Blur until verified
+                                    }} 
+                                />
+                                <div style={{ 
+                                    position: 'absolute', top: '10px', right: '10px', 
+                                    background: 'var(--primary)', color: 'white', 
+                                    padding: '5px 10px', borderRadius: '5px', fontSize: '0.8rem' 
+                                }}>
+                                    {item.confidence}% Match
+                                </div>
+                            </div>
+                            
+                            <div style={{ padding: '15px' }}>
+                                <p><strong>Found at:</strong> {item.location}</p>
+                                <p style={{ fontSize: '0.8rem', color: '#666', marginBottom: '15px' }}>
+                                    Item ID: {item.found_item_id.substring(0, 8)}...
+                                </p>
+                                
+                                <button 
+                                    className="btn-primary" 
+                                    onClick={() => navigate(`/guardian/${item.found_item_id}`, { state: { imageUrl: item.image_url } })}
+                                >
+                                    Initiate Verification
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
 }
 
 export default Matches;
