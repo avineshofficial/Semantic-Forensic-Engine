@@ -1,0 +1,30 @@
+# backend/.gitignore
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Secrets & Config (CRITICAL)
+serviceAccountKey.json
+.env
+
+# Local Database / Uploads
+uploads/
+*.db
+*.sqlite3
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
